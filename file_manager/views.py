@@ -1,27 +1,21 @@
+from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status, viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import status, viewsets
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from .models import Folder
 from .permissions import IsOwner, IsOwnerOrSharedWith
 from .serializers import FolderSerializer
 
-
-class FolderCreateView(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]
-    queryset = Folder.objects.all()
-    serializer_class = FolderSerializer
+User = get_user_model()
 
 
-class FolderReadOneView(generics.RetrieveAPIView):
-    queryset = Folder.objects.all()
-    permission_classes = [IsOwnerOrSharedWith]
-    serializer_class = FolderSerializer
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 
 class FolderViewSet(viewsets.ModelViewSet):
+    queryset = Folder.objects.all()
     serializer_class = FolderSerializer
     permission_classes = [IsOwnerOrSharedWith]
 
@@ -38,18 +32,9 @@ class FolderViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-
-class FolderDeleteView(generics.DestroyAPIView):
-    permission_classes = [IsOwner]
-    queryset = Folder.objects.all()
-    serializer_class = FolderSerializer
-
-
-class ShareFolderView(APIView):
-    permission_classes = [IsOwner]
-
-    def post(self, request, folder_id):
-        folder = get_object_or_404(Folder, id=folder_id)
+    @action(detail=True, methods=['post'], permission_classes=[IsOwner])
+    def share(self, request, pk=None):
+        folder = get_object_or_404(Folder, id=pk)
 
         # Manually check object permissions
         self.check_object_permissions(request, folder)
@@ -59,17 +44,14 @@ class ShareFolderView(APIView):
         return Response({"status": "folder shared"}, status=status.HTTP_200_OK)
 
 
-class UnshareFolderView(APIView):
-    permission_classes = [IsOwner]
-
-    def post(self, request, folder_id):
-        folder = get_object_or_404(Folder, id=folder_id)
+    @action(detail=True, methods=['post'], permission_classes=[IsOwner])
+    def unshare(self, request, pk=None):
+        folder = get_object_or_404(Folder, id=pk)
         self.check_object_permissions(request, folder)
 
         user_to_unshare_with = User.objects.get(username=request.data.get("username"))
         folder.shared_with.remove(user_to_unshare_with)
         return Response({"status": "folder unshared"}, status=status.HTTP_200_OK)
-
 
 # Common
 # class SearchView(generics.GenericAPIView):
