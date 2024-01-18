@@ -42,7 +42,7 @@ class Folder(models.Model):
         return url_list
 
     def save(self, *args, **kwargs):
-        if Folder.objects.filter(name=self.name, parent=self.parent).exclude(pk=self.pk).exists():
+        if Folder.objects.filter(name=self.name, parent=self.parent, owner=self.owner).exclude(pk=self.pk).exists():
             raise ValidationError(f"A folder with the name '{self.name}' already exists in the same location.")
 
         super().save(*args, **kwargs)
