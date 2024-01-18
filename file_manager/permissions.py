@@ -81,23 +81,31 @@ class CanDelete(CanAccess):
         ).exists()
 
 
-class CanEditParentFolder(CanAccess):
+class CanEditParentFolder(IsAuthenticated):
     message = "You do not have permission to create a folder in this location."
 
-    def check_permission(self, request, view):
+    def has_permission(self, request, view):
+        # If it's not a 'create' action, this check is not needed
+        if view.action != "create":
+            return True
+
         parent_id = request.data.get("parent")
 
+        # If no parent_id, it's a root folder, allow creation
         if not parent_id:
             return True
 
         try:
             parent_folder = Folder.objects.get(pk=parent_id)
         except Folder.DoesNotExist:
+            # If parent folder does not exist, deny permission
             return False
 
+        # If the user is the owner of the parent folder, allow creation
         if parent_folder.owner == request.user:
             return True
 
+        # Check if the user has edit permissions on the parent folder
         folder_content_type = ContentType.objects.get_for_model(Folder)
         return Share.objects.filter(
             shared_with=request.user,
