@@ -6,10 +6,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 
+from .mixins import UniqueNameMixin
+
 User = get_user_model()
 
 
-class Folder(models.Model):
+class Folder(UniqueNameMixin, models.Model):
     name = models.CharField(max_length=128)
     owner = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="owned_folders"
@@ -41,12 +43,6 @@ class Folder(models.Model):
 
         return url_list
 
-    def save(self, *args, **kwargs):
-        if Folder.objects.filter(name=self.name, parent=self.parent, owner=self.owner).exclude(pk=self.pk).exists():
-            raise ValidationError(f"A folder with the name '{self.name}' already exists in the same location.")
-
-        super().save(*args, **kwargs)
-
 
 class Share(models.Model):
     shared_by = models.ForeignKey(User, related_name='shares_made', on_delete=models.CASCADE)
@@ -67,7 +63,7 @@ class Share(models.Model):
         return f"{self.user} -> {self.content_object}"
 
 
-class File(models.Model):
+class File(UniqueNameMixin, models.Model):
     name = models.CharField(max_length=128)
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, null=True, blank=True)
     file = models.FileField(upload_to="documents/")
