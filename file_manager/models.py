@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 
-from .mixins import UniqueNameMixin
+from file_manager.mixins.models import UniqueNameMixin
 
 User = get_user_model()
 
@@ -45,11 +45,15 @@ class Folder(UniqueNameMixin, models.Model):
 
 
 class Share(models.Model):
-    shared_by = models.ForeignKey(User, related_name='shares_made', on_delete=models.CASCADE)
-    shared_with = models.ForeignKey(User, related_name='shares_received', on_delete=models.CASCADE)
+    shared_by = models.ForeignKey(
+        User, related_name="shares_made", on_delete=models.CASCADE
+    )
+    shared_with = models.ForeignKey(
+        User, related_name="shares_received", on_delete=models.CASCADE
+    )
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey('content_type', 'object_id')
+    content_object = GenericForeignKey("content_type", "object_id")
 
     can_read = models.BooleanField(default=True)
     can_edit = models.BooleanField(default=False)
@@ -57,7 +61,7 @@ class Share(models.Model):
     can_share = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('content_type', 'object_id', 'shared_with')
+        unique_together = ("content_type", "object_id", "shared_with")
 
     def __str__(self):
         return f"{self.user} -> {self.content_object}"
