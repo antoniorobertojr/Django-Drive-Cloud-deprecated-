@@ -11,11 +11,9 @@ from file_manager.mixins.models import UniqueNameMixin
 User = get_user_model()
 
 
-class Folder(UniqueNameMixin, models.Model):
+class Folder(models.Model, UniqueNameMixin):
     name = models.CharField(max_length=128)
-    owner = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="owned_folders"
-    )
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
     parent = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="children"
     )
@@ -43,6 +41,10 @@ class Folder(UniqueNameMixin, models.Model):
 
         return url_list
 
+    def save(self, *args, **kwargs):
+        self.check_model_has_unique_name()
+        super().save(*args, **kwargs)
+
 
 class Share(models.Model):
     shared_by = models.ForeignKey(
@@ -67,7 +69,7 @@ class Share(models.Model):
         return f"{self.user} -> {self.content_object}"
 
 
-class File(UniqueNameMixin, models.Model):
+class File(models.Model, UniqueNameMixin):
     name = models.CharField(max_length=128)
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, null=True, blank=True)
     file = models.FileField(upload_to="documents/")
@@ -80,17 +82,9 @@ class File(UniqueNameMixin, models.Model):
     def __str__(self):
         return f"{self.name}"
 
-    def save(
-        self, force_insert=False, force_update=False, using=None, update_fields=None
-    ):
-        if not self.name:
-            self.name = self.file.name
-        return super().save(
-            force_insert=force_insert,
-            force_update=force_update,
-            using=using,
-            update_fields=update_fields,
-        )
+    def save(self, *args, **kwargs):
+        self.check_model_has_unique_name()
+        super().save(*args, **kwargs)
 
     @property
     def full_path(self):
