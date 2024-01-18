@@ -1,7 +1,9 @@
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from rest_framework import mixins, serializers, status, viewsets
+from drf_spectacular.utils import extend_schema
+from rest_framework import mixins, parsers, renderers, serializers, status, viewsets
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from file_manager.mixins.views import (
@@ -21,7 +23,12 @@ from .permissions import (
     CanShare,
     IsOwner,
 )
-from .serializers import FolderSerializer, ShareSerializer
+from .serializers import (
+    FileSerializer,
+    FolderSerializer,
+    ShareSerializer,
+    UnshareSerializer,
+)
 
 
 class FolderViewSet(
@@ -42,6 +49,8 @@ class FolderViewSet(
     def get_serializer(self, *args, **kwargs):
         if self.action == "share":
             return ShareSerializer(*args, **kwargs)
+        elif self.action == "unshare":
+            return UnshareSerializer(*args, **kwargs)
         return super().get_serializer(*args, **kwargs)
 
     def get_permissions(self):
@@ -79,3 +88,34 @@ class FolderViewSet(
             return Folder.objects.filter(Q(owner=user) | Q(id__in=shared_folders_ids))
 
         return super().get_queryset()
+
+
+class FileViewSet(
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+    # Custom Mixins,
+    CustomCreateModelMixin,
+    ShareModelMixin,
+    UnshareModelMixin,
+    SharedWithMeMixin,
+    PersonalMixin,
+):
+    queryset = File.objects.all()
+    serializer_class = FileSerializer
+
+    @extend_schema(
+        operation_id="upload_file",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string", "format": "binary"},
+                    "folder": {"type": "integer", "format": "int64"},
+                },
+            },
+        },
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
