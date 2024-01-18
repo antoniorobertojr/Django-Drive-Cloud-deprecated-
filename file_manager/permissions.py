@@ -13,7 +13,7 @@ class IsOwner(IsAuthenticated):
         return obj.owner == request.user
 
 
-class CurrentUserCanAccess(IsAuthenticated):
+class CanAccess(IsAuthenticated):
     def _get_content_type(self, obj):
         if isinstance(obj, Folder):
             return ContentType.objects.get_for_model(Folder)
@@ -33,7 +33,7 @@ class CurrentUserCanAccess(IsAuthenticated):
         raise NotImplementedError("Subclasses must implement this method")
 
 
-class CurrentUserCanRead(CurrentUserCanAccess):
+class CanRead(CanAccess):
     message = "You do not have read permissions for this object."
 
     def check_permission(self, request, obj, content_type):
@@ -41,10 +41,11 @@ class CurrentUserCanRead(CurrentUserCanAccess):
             content_type=content_type,
             object_id=obj.id,
             shared_with=request.user,
-            can_read=True
+            can_read=True,
         ).exists()
 
-class CurrentUserCanEdit(CurrentUserCanAccess):
+
+class CanEdit(CanAccess):
     message = "You do not have edit permissions for this object."
 
     def check_permission(self, request, obj, content_type):
@@ -52,10 +53,11 @@ class CurrentUserCanEdit(CurrentUserCanAccess):
             content_type=content_type,
             object_id=obj.id,
             shared_with=request.user,
-            can_edit=True
+            can_edit=True,
         ).exists()
 
-class CurrentUserCanShare(CurrentUserCanAccess):
+
+class CanShare(CanAccess):
     message = "You do not have share permissions for this object."
 
     def check_permission(self, request, obj, content_type):
@@ -63,10 +65,11 @@ class CurrentUserCanShare(CurrentUserCanAccess):
             content_type=content_type,
             object_id=obj.id,
             shared_with=request.user,
-            can_share=True
+            can_share=True,
         ).exists()
 
-class CurrentUserCanDelete(CurrentUserCanAccess):
+
+class CanDelete(CanAccess):
     message = "You do not have delete permissions for this object."
 
     def check_permission(self, request, obj, content_type):
@@ -74,5 +77,31 @@ class CurrentUserCanDelete(CurrentUserCanAccess):
             content_type=content_type,
             object_id=obj.id,
             shared_with=request.user,
-            can_delete=True
+            can_delete=True,
+        ).exists()
+
+
+class CanEditParentFolder(CanAccess):
+    message = "You do not have permission to create a folder in this location."
+
+    def check_permission(self, request, view):
+        parent_id = request.data.get("parent")
+
+        if not parent_id:
+            return True
+
+        try:
+            parent_folder = Folder.objects.get(pk=parent_id)
+        except Folder.DoesNotExist:
+            return False
+
+        if parent_folder.owner == request.user:
+            return True
+
+        folder_content_type = ContentType.objects.get_for_model(Folder)
+        return Share.objects.filter(
+            shared_with=request.user,
+            content_type=folder_content_type,
+            object_id=parent_id,
+            can_edit=True,
         ).exists()
