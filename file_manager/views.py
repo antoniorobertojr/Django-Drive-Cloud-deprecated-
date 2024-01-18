@@ -1,72 +1,99 @@
-from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
+from rest_framework import mixins, serializers, viewsets
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
 
-from .models import Folder
-from .permissions import IsOwner, IsOwnerOrSharedWith
-from .serializers import FolderSerializer
-
-User = get_user_model()
-
-
-from rest_framework.decorators import action
-from rest_framework.response import Response
+from .mixins import (PersonalMixin, SharedWithMeMixin, ShareModelMixin,
+                     UnshareModelMixin)
+from .models import Folder, Share
+from .permissions import (CurrentUserCanDelete, CurrentUserCanEdit,
+                          CurrentUserCanRead, CurrentUserCanShare, IsOwner)
+from .serializers import FolderSerializer, ShareFolderSerializer
 
 
-class FolderViewSet(viewsets.ModelViewSet):
+class FolderViewSet(mixins.CreateModelMixin,
+                   mixins.RetrieveModelMixin,
+                   mixins.UpdateModelMixin,
+                   mixins.DestroyModelMixin,
+                   viewsets.GenericViewSet,
+                   # Custom Mixins
+                   ShareModelMixin,
+                   UnshareModelMixin,
+                   SharedWithMeMixin,
+                   PersonalMixin):
+
     queryset = Folder.objects.all()
     serializer_class = FolderSerializer
-    permission_classes = [IsOwnerOrSharedWith]
+
+    def get_serializer(self, *args, **kwargs):
+        if self.action == 'share':
+            return ShareFolderSerializer(*args, **kwargs)
+        return super().get_serializer(*args, **kwargs)
+
+    def get_permissions(self):
+        if self.action == "retrieve":
+            permission_classes = [IsOwner | CurrentUserCanRead]
+        elif self.action in ["update", "partial_update"]:
+            permission_classes = [IsOwner | CurrentUserCanEdit]
+        elif self.action in ["share", "unshare"]:
+            permission_classes = [IsOwner | CurrentUserCanShare]
+        elif self.action == "destroy":
+            permission_classes = [IsOwner | CurrentUserCanDelete]
+        else: # create
+            permission_classes = [IsAuthenticated]
+
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
-        queryset = Folder.objects.all()
-        name = self.request.query_params.get("name", None)
-        parent_id = self.request.query_params.get("parent", None)
+        user = self.request.user
 
-        if name:
-            queryset = queryset.filter(name__icontains=name)
+        if self.action == 'personal_folders':
+            return Folder.objects.filter(owner=user)
 
+        elif self.action == 'shared_with_me':
+            folder_content_type = ContentType.objects.get_for_model(Folder)
+            shared_folders_ids = Share.objects.filter(
+                shared_with=user, 
+                content_type=folder_content_type,
+                can_read=True
+            ).values_list('object_id', flat=True)
+            return Folder.objects.filter(id__in=shared_folders_ids)
+
+        elif self.action == 'retrieve':
+            folder_content_type = ContentType.objects.get_for_model(Folder)
+            shared_folders_ids = Share.objects.filter(
+                shared_with=user, 
+                content_type=folder_content_type,
+                can_read=True
+            ).values_list('object_id', flat=True)
+            return Folder.objects.filter(Q(owner=user) | Q(id__in=shared_folders_ids))
+
+        return super().get_queryset()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        parent_id = serializer.validated_data.get('parent')
         if parent_id:
-            queryset = queryset.filter(parent_id=parent_id)
+            try:
+                parent_folder = Folder.objects.get(pk=parent_id)
+            except Folder.DoesNotExist:
+                raise serializers.ValidationError("Parent folder does not exist.")
 
-        return queryset
+            if parent_folder.owner != user:
+                folder_content_type = ContentType.objects.get_for_model(Folder)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsOwner])
-    def share(self, request, pk=None):
-        folder = get_object_or_404(Folder, id=pk)
+                try:
+                    share = Share.objects.get(
+                        shared_with=user,
+                        content_type=folder_content_type,
+                        object_id=parent_id,
+                        can_edit=True
+                    )
+                except Share.DoesNotExist:
+                    raise PermissionDenied("You do not have permission to create a folder in this location.")
 
-        # Manually check object permissions
-        self.check_object_permissions(request, folder)
-
-        user_to_share_with = User.objects.get(username=request.data.get("username"))
-        folder.shared_with.add(user_to_share_with)
-        return Response({"status": "folder shared"}, status=status.HTTP_200_OK)
-
-
-    @action(detail=True, methods=['post'], permission_classes=[IsOwner])
-    def unshare(self, request, pk=None):
-        folder = get_object_or_404(Folder, id=pk)
-        self.check_object_permissions(request, folder)
-
-        user_to_unshare_with = User.objects.get(username=request.data.get("username"))
-        folder.shared_with.remove(user_to_unshare_with)
-        return Response({"status": "folder unshared"}, status=status.HTTP_200_OK)
-
-# Common
-# class SearchView(generics.GenericAPIView):
-#     def get(self, request, *args, **kwargs):
-#         query = request.query_params.get("q", "")
-
-#         # Search in Files
-#         files = File.objects.filter(name__icontains=query)
-#         file_serializer = FileSerializer(files, many=True)
-
-#         # Search in Folders
-#         folders = Folder.objects.filter(name__icontains=query)
-#         folder_serializer = FolderSerializer(folders, many=True)
-
-#         return Response(
-#             {"files": file_serializer.data, "folders": folder_serializer.data},
-#             status=status.HTTP_200_OK,
-#         )
+        try:
+            serializer.save(owner=user)
+        except Exception as e:
+            raise serializers.ValidationError({"detail": str(e)})
