@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -61,3 +62,26 @@ class ShareModelMixin:
                 failed_shares.append(username)
 
         return successful_shares, failed_shares
+
+
+class UnshareModelMixin:
+    @action(detail=True, methods=["post"], permission_classes=[IsOwner | CurrentUserCanShare])
+    def unshare(self, request, pk=None):
+        obj = self.get_object()
+        username = request.data.get("username")
+        user_to_unshare_with = get_object_or_404(User, username=username)
+
+        # Check if it's trying to unshare with owner
+        if obj.owner == user_to_unshare_with:
+            return Response({"error": "Cannot unshare with the owner"}, status=status.HTTP_400_BAD_REQUEST)
+
+        content_type = ContentType.objects.get_for_model(obj)
+
+        # Delete the Share instance
+        Share.objects.filter(
+            shared_with=user_to_unshare_with,
+            content_type=content_type,
+            object_id=obj.id
+        ).delete()
+
+        return Response({"status": f"{obj} unshared from {username}"}, status=status.HTTP_200_OK)
