@@ -3,19 +3,35 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from file_manager.models import Share
-from file_manager.permissions import CurrentUserCanShare, IsOwner
-from rest_framework import status
+from file_manager.permissions import CanShare, IsOwner
+from rest_framework import mixins, serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 User = get_user_model()
 
 
+class CustomCreateModelMixin(mixins.CreateModelMixin):
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                serializer.data, status=status.HTTP_201_CREATED, headers=headers
+            )
+        except serializers.ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class ShareModelMixin:
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsOwner | CurrentUserCanShare],
+        permission_classes=[IsOwner | CanShare],
     )
     def share(self, request, pk=None):
         obj = self.get_object()
@@ -81,7 +97,7 @@ class UnshareModelMixin:
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsOwner | CurrentUserCanShare],
+        permission_classes=[IsOwner | CanShare],
     )
     def unshare(self, request, pk=None):
         obj = self.get_object()
