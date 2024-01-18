@@ -71,13 +71,11 @@ class UnshareModelMixin:
         username = request.data.get("username")
         user_to_unshare_with = get_object_or_404(User, username=username)
 
-        # Check if it's trying to unshare with owner
         if obj.owner == user_to_unshare_with:
             return Response({"error": "Cannot unshare with the owner"}, status=status.HTTP_400_BAD_REQUEST)
 
         content_type = ContentType.objects.get_for_model(obj)
 
-        # Delete the Share instance
         Share.objects.filter(
             shared_with=user_to_unshare_with,
             content_type=content_type,
@@ -85,3 +83,19 @@ class UnshareModelMixin:
         ).delete()
 
         return Response({"status": f"{obj} unshared from {username}"}, status=status.HTTP_200_OK)
+
+
+class SharedWithMeMixin:
+    @action(detail=False, methods=["get"])
+    def shared_with_me(self, request, *args, **kwargs):
+        model = self.queryset.model
+        model_content_type = ContentType.objects.get_for_model(model)
+        shared_objects_ids = Share.objects.filter(
+            shared_with=request.user, 
+            content_type=model_content_type,
+            can_read=True
+        ).values_list('object_id', flat=True)
+
+        shared_objects = model.objects.filter(id__in=shared_objects_ids)
+        serializer = self.get_serializer(shared_objects, many=True)
+        return Response(serializer.data)
