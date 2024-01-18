@@ -1,11 +1,11 @@
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from rest_framework import mixins, serializers, viewsets
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import mixins, serializers, status, viewsets
+from rest_framework.response import Response
 
 from file_manager.mixins.views import (
+    CustomCreateModelMixin,
     PersonalMixin,
     SharedWithMeMixin,
     ShareModelMixin,
@@ -21,16 +21,16 @@ from .permissions import (
     CanShare,
     IsOwner,
 )
-from .serializers import FileSerializer, FolderSerializer, ShareSerializer
+from .serializers import FolderSerializer, ShareSerializer
 
 
 class FolderViewSet(
-    mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
-    # Custom Mixins
+    # Custom Mixins,
+    CustomCreateModelMixin,
     ShareModelMixin,
     UnshareModelMixin,
     SharedWithMeMixin,
@@ -79,7 +79,3 @@ class FolderViewSet(
             return Folder.objects.filter(Q(owner=user) | Q(id__in=shared_folders_ids))
 
         return super().get_queryset()
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        serializer.save(owner=user)
