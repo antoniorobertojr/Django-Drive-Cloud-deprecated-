@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 
@@ -39,6 +40,12 @@ class Folder(models.Model):
             url_list.append(reverse("folder:list") + "?id=" + str(temp.pk))
 
         return url_list
+
+    def save(self, *args, **kwargs):
+        if Folder.objects.filter(name=self.name, parent=self.parent).exclude(pk=self.pk).exists():
+            raise ValidationError(f"A folder with the name '{self.name}' already exists in the same location.")
+
+        super().save(*args, **kwargs)
 
 
 class Share(models.Model):
