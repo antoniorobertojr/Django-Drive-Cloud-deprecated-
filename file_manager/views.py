@@ -74,26 +74,24 @@ class FolderViewSet(mixins.CreateModelMixin,
     def perform_create(self, serializer):
         user = self.request.user
         parent_id = serializer.validated_data.get('parent')
+
         if parent_id:
-            try:
-                parent_folder = Folder.objects.get(pk=parent_id)
-            except Folder.DoesNotExist:
-                raise serializers.ValidationError("Parent folder does not exist.")
-
-            if parent_folder.owner != user:
-                folder_content_type = ContentType.objects.get_for_model(Folder)
-
-                try:
-                    share = Share.objects.get(
-                        shared_with=user,
-                        content_type=folder_content_type,
-                        object_id=parent_id,
-                        can_edit=True
-                    )
-                except Share.DoesNotExist:
-                    raise PermissionDenied("You do not have permission to create a folder in this location.")
+            parent_folder = self._check_parent_folder(parent_id)
+            self._check_user_permissions(user, parent_folder, parent_id)
 
         try:
             serializer.save(owner=user)
         except Exception as e:
             raise serializers.ValidationError({"detail": str(e)})
+
+    def _check_parent_folder(self, parent_id):
+        try:
+            return Folder.objects.get(pk=parent_id)
+        except Folder.DoesNotExist:
+            raise serializers.ValidationError({"parent": "Parent folder does not exist."})
+
+    def _check_user_permissions(self, user, parent_folder, parent_id):
+        if parent_folder.owner != user:
+            folder_content_type = ContentType.objects.get_for_model(Folder)
+            if not Share.objects.filter(shared_with=user, content_type=folder_content_type, object_id=parent_id, can_edit=True).exists():
+                raise PermissionDenied("You do not have permission to create a folder in this location.")
