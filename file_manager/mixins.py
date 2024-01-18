@@ -99,3 +99,14 @@ class SharedWithMeMixin:
         shared_objects = model.objects.filter(id__in=shared_objects_ids)
         serializer = self.get_serializer(shared_objects, many=True)
         return Response(serializer.data)
+
+class PersonalMixin:
+    @action(detail=False, methods=["get"], url_path="personal")
+    def personal_folders(self, request, *args, **kwargs):
+        # Get the model from the queryset
+        model = self.queryset.model
+        # Filter the queryset for personal folders (assuming owner field)
+        personal_folders = model.objects.filter(owner=request.user)
+        # Use the appropriate serializer
+        serializer = self.get_serializer(personal_folders, many=True)
+        return Response(serializer.data)
