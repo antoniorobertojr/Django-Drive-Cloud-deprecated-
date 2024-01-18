@@ -4,7 +4,7 @@ from .models import ContentType, File, Folder, Share
 
 
 class IsOwner(IsAuthenticated):
-    message = "You must be the owner of this folder or it must be shared with you to access it."
+    message = "You must be the owner of this object or it must be shared with you to access it."
 
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated
