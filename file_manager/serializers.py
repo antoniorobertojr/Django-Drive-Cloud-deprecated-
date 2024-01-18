@@ -32,7 +32,7 @@ class FolderSerializer(serializers.ModelSerializer):
         return FileSerializer(files, many=True).data
 
 
-class ShareFolderSerializer(serializers.Serializer):
+class ShareSerializer(serializers.Serializer):
     usernames = serializers.ListField(
         child=serializers.CharField(),
         write_only=True,
