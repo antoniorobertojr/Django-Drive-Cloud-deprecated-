@@ -1,0 +1,63 @@
+from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from .models import Share
+from .permissions import CurrentUserCanShare, IsOwner
+
+User = get_user_model()
+
+class ShareModelMixin:
+    @action(detail=True, methods=["post"], permission_classes=[IsOwner | CurrentUserCanShare])
+    def share(self, request, pk=None):
+        obj = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            return self._process_sharing(request, obj, serializer.validated_data)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def _process_sharing(self, request, obj, validated_data):
+        current_user = request.user
+        usernames = validated_data['usernames']
+        permissions = {
+            'can_read': validated_data['can_read'],
+            'can_edit': validated_data['can_edit'],
+            'can_delete': validated_data['can_delete'],
+            'can_share': validated_data['can_share']
+        }
+
+        if request.user.username in usernames:
+            return Response({"error": "Cannot share with yourself"}, status=status.HTTP_400_BAD_REQUEST)
+
+        successful_shares, failed_shares = self._share_with_users(obj, current_user, usernames, permissions)
+
+        return Response({
+            "status": "Sharing process completed",
+            "shared_with": successful_shares,
+            "failed_to_share_with": failed_shares
+        }, status=status.HTTP_200_OK)
+
+    def _share_with_users(self, obj, shared_by, usernames, permissions):
+        successful_shares = []
+        failed_shares = []
+        content_type = ContentType.objects.get_for_model(obj)
+
+        for username in usernames:
+            try:
+                user_to_share_with = User.objects.get(username=username)
+                Share.objects.update_or_create(
+                    shared_by=shared_by,
+                    shared_with=user_to_share_with,
+                    content_type=content_type,
+                    object_id=obj.id,
+                    defaults=permissions
+                )
+                successful_shares.append(username)
+            except User.DoesNotExist:
+                failed_shares.append(username)
+
+        return successful_shares, failed_shares
