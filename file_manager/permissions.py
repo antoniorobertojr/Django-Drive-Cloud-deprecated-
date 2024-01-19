@@ -84,7 +84,7 @@ class CanDelete(CanAccess):
 class CanEditParentFolder(IsAuthenticated):
     message = "You do not have permission to create a folder in this location."
 
-    def has_permission(self, request, view):
+    def has_object_permission(self, request, view):
         # If it's not a 'create' action, this check is not needed
         if view.action != "create":
             return True
