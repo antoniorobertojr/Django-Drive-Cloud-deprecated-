@@ -1,8 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
-from rest_framework.decorators import action
 
 from file_manager.mixins.views import (
     CustomCreateModelMixin,
