@@ -4,24 +4,37 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 
-from file_manager.mixins.views import (CustomCreateModelMixin,
-                                       FileDownloadMixin, PersonalMixin,
-                                       SharedWithMeMixin, ShareModelMixin,
-                                       UnshareModelMixin)
+from file_manager.mixins.views import (
+    CustomCreateModelMixin,
+    FileDownloadMixin,
+    PersonalMixin,
+    SharedWithMeMixin,
+    ShareModelMixin,
+    UnshareModelMixin,
+)
 
 from .models import File, Folder, Share
-from .permissions import (CanDelete, CanEdit, CanEditParentFolder, CanRead,
-                          CanShare, IsOwner)
-from .serializers import (FileSerializer, FolderSerializer, ShareSerializer,
-                          UnshareSerializer)
+from .permissions import (
+    CanDelete,
+    CanEdit,
+    CanEditParentFolder,
+    CanRead,
+    CanShare,
+    IsOwner,
+)
+from .serializers import (
+    FileSerializer,
+    FolderSerializer,
+    ShareSerializer,
+    UnshareSerializer,
+)
 
 
 class BaseViewSet(
+    viewsets.GenericViewSet,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
-    viewsets.GenericViewSet,
-    # Custom Mixins,
     CustomCreateModelMixin,
     ShareModelMixin,
     UnshareModelMixin,
@@ -29,49 +42,41 @@ class BaseViewSet(
     PersonalMixin,
 ):
     model = None
+    action_to_permission = {
+        "retrieve": [IsOwner | CanRead],
+        "download": [IsOwner | CanRead],
+        "personal": [IsOwner | CanRead],
+        "shared_with_me": [IsOwner | CanRead],
+        "update": [IsOwner | CanEdit],
+        "partial_update": [IsOwner | CanEdit],
+        "share": [IsOwner | CanShare],
+        "unshare": [IsOwner | CanShare],
+        "destroy": [IsOwner | CanDelete],
+        "create": [CanEditParentFolder],
+    }
 
-    def get_serializer(self, *args, **kwargs):
+    def get_serializer_class(self):
         if self.action == "share":
-            return ShareSerializer(*args, **kwargs)
+            return ShareSerializer
         elif self.action == "unshare":
-            return UnshareSerializer(*args, **kwargs)
-        return super().get_serializer(*args, **kwargs)
+            return UnshareSerializer
+        return self.serializer_class
 
     def get_permissions(self):
-        print(self.action)
-        if self.action in ["retrieve", "download", "personal", "shared_with_me"]:
-            permission_classes = [IsOwner | CanRead]
-        elif self.action in ["update", "partial_update"]:
-            permission_classes = [IsOwner | CanEdit]
-        elif self.action in ["share", "unshare"]:
-            permission_classes = [IsOwner | CanShare]
-        elif self.action == "destroy":
-            permission_classes = [IsOwner | CanDelete]
-        else:  # create
-            permission_classes = [CanEditParentFolder]
-
+        permission_classes = self.action_to_permission.get(
+            self.action, [CanEditParentFolder]
+        )
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
-        user = self.request.user
-
-        if self.action == "get_personal_models":
-            return self.model.objects.filter(owner=user)
-
-        elif self.action == "shared_with_me":
-            folder_content_type = ContentType.objects.get_for_model(self.model)
-            shared_models_ids = Share.objects.filter(
-                shared_with=user, content_type=folder_content_type, can_read=True
+        if self.action in ["personal", "get_personal_models"]:
+            return self.model.objects.filter(owner=self.request.user)
+        if self.action == "shared_with_me":
+            content_type = ContentType.objects.get_for_model(self.model)
+            shared_ids = Share.objects.filter(
+                shared_with=self.request.user, content_type=content_type, can_read=True
             ).values_list("object_id", flat=True)
-            return self.model.objects.filter(id__in=shared_models_ids)
-
-        elif self.action == "retrieve":
-            folder_content_type = ContentType.objects.get_for_model(self.model)
-            shared_models_ids = Share.objects.filter(
-                shared_with=user, content_type=folder_content_type, can_read=True
-            ).values_list("object_id", flat=True)
-            return self.model.objects.filter(Q(owner=user) | Q(id__in=shared_models_ids))
-
+            return self.model.objects.filter(id__in=shared_ids)
         return super().get_queryset()
 
     @action(detail=False, methods=["get"], url_path="personal")
@@ -89,11 +94,7 @@ class FolderViewSet(BaseViewSet):
     model = Folder
 
 
-class FileViewSet(
-    BaseViewSet,
-    # Custom Mixinxs
-    FileDownloadMixin
-    ):
+class FileViewSet(BaseViewSet, FileDownloadMixin):
     queryset = File.objects.all()
     serializer_class = FileSerializer
     model = File
@@ -107,13 +108,13 @@ class FileViewSet(
                     "file": {"type": "string", "format": "binary"},
                     "folder": {"type": "integer", "format": "int64"},
                 },
-            },
+            }
         },
     )
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=["get"])
     def download(self, request, *args, **kwargs):
-        pk = kwargs.get('pk')
+        pk = kwargs.get("pk")
         return self.download_file(pk)
