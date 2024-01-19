@@ -27,12 +27,17 @@ class FolderSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "owner", "parent", "children", "files"]
 
     def get_children(self, obj):
-        print("Type of obj in get_children:", type(obj))
-        children = obj.children.values("id", "name") if hasattr(obj, "children") else []
+        children = (
+            obj.children.values(
+                "id",
+                "name",
+            )
+            if hasattr(obj, "children")
+            else []
+        )
         return list(children)
 
     def get_files(self, obj):
-        print("Type of obj in get_files:", type(obj))  # For debugging
         if isinstance(obj, Folder):
             files = obj.file_set.all()
             return FileSerializer(files, many=True).data
