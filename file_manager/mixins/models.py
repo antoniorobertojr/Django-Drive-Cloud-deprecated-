@@ -7,9 +7,13 @@ class UniqueNameMixin:
     """
 
     def check_model_has_unique_name(self, *args, **kwargs):
-        model = self.__class__
-        query = model.objects.filter(name=self.name, owner=self.owner)
+        from file_manager.models import File
 
+        model = self.__class__
+        if isinstance(self, File):
+            query = model.objects.filter(name=self.name, owner=self.owner, folder=self.folder)
+        else: # Folder
+            query = model.objects.filter(name=self.name, owner=self.owner, parent=self.parent)
         if hasattr(self, "parent"):
             query = query.filter(parent=self.parent)
 
