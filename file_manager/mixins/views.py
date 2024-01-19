@@ -130,7 +130,8 @@ class UnshareModelMixin:
 
 
 class SharedWithMeMixin:
-    def get_shared_with_me(self, request, *args, **kwargs):
+    @action(detail=False, methods=["get"])
+    def shared_with_me(self, request, *args, **kwargs):
         model = self.queryset.model
         model_content_type = ContentType.objects.get_for_model(model)
         shared_objects_ids = Share.objects.filter(
@@ -143,7 +144,8 @@ class SharedWithMeMixin:
 
 
 class PersonalMixin:
-    def get_personal_models(self, request, *args, **kwargs):
+    @action(detail=False, methods=["get"], url_path="personal")
+    def personal(self, request, *args, **kwargs):
         model = self.queryset.model
         personal_models = model.objects.filter(owner=request.user)
         serializer = self.get_serializer(personal_models, many=True)
@@ -151,7 +153,8 @@ class PersonalMixin:
 
 
 class FileDownloadMixin:
-    def download_file(self, pk):
+    @action(detail=True, methods=["get"])
+    def download(self, pk):
         try:
             file_instance = self.get_queryset().get(pk=pk)
         except File.DoesNotExist:
@@ -161,4 +164,6 @@ class FileDownloadMixin:
         if not os.path.exists(file_path):
             raise Http404("File does not exist on the server")
 
-        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=file_instance.name)
+        return FileResponse(
+            open(file_path, "rb"), as_attachment=True, filename=file_instance.name
+        )

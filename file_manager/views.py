@@ -79,14 +79,6 @@ class BaseViewSet(
             return self.model.objects.filter(id__in=shared_ids)
         return super().get_queryset()
 
-    @action(detail=False, methods=["get"], url_path="personal")
-    def personal(self, request, *args, **kwargs):
-        return self.get_personal_models(request, *args, **kwargs)
-
-    @action(detail=False, methods=["get"])
-    def shared_with_me(self, request, *args, **kwargs):
-        return self.get_shared_with_me(request, *args, **kwargs)
-
 
 class FolderViewSet(BaseViewSet):
     queryset = Folder.objects.all()
@@ -113,8 +105,3 @@ class FileViewSet(BaseViewSet, FileDownloadMixin):
     )
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
-
-    @action(detail=True, methods=["get"])
-    def download(self, request, *args, **kwargs):
-        pk = kwargs.get("pk")
-        return self.download_file(pk)
