@@ -3,113 +3,93 @@ from rest_framework.permissions import IsAuthenticated
 from .models import ContentType, File, Folder, Share
 
 
-class IsOwner(IsAuthenticated):
-    message = "You must be the owner of this object or it must be shared with you to access it."
+class BaseAccessPermission(IsAuthenticated):
+    """Base permission class to check object-level permissions based on shared access."""
 
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
+    permission_field = None  # To be defined in subclasses
+
+    def _get_content_type(self, obj):
+        return ContentType.objects.get_for_model(type(obj))
+
+    def has_object_permission(self, request, view, obj):
+        if obj.owner == request.user:
+            return True  # Owner always has permission
+
+        content_type = self._get_content_type(obj)
+        return self.check_shared_permission(request, obj, content_type)
+
+    def check_shared_permission(self, request, obj, content_type):
+        if not content_type or not self.permission_field:
+            return False
+
+        return Share.objects.filter(
+            content_type=content_type,
+            object_id=obj.id,
+            shared_with=request.user,
+            **{self.permission_field: True}
+        ).exists()
+
+
+class IsOwner(IsAuthenticated):
+    """Check if the request user is the owner of the object."""
+
+    message = "You must be the owner of this object to access it."
 
     def has_object_permission(self, request, view, obj):
         return obj.owner == request.user
 
 
-class CanAccess(IsAuthenticated):
-    def _get_content_type(self, obj):
-        if isinstance(obj, Folder):
-            return ContentType.objects.get_for_model(Folder)
-        elif isinstance(obj, File):
-            return ContentType.objects.get_for_model(File)
-        else:
-            return None
+class CanRead(BaseAccessPermission):
+    """Check if the user has read permission for the object."""
 
-    def has_object_permission(self, request, view, obj):
-        content_type = self._get_content_type(obj)
-        if not content_type:
-            return False
-
-        return self.check_permission(request, obj, content_type)
-
-    def check_permission(self, request, obj, content_type):
-        raise NotImplementedError("Subclasses must implement this method")
-
-
-class CanRead(CanAccess):
     message = "You do not have read permissions for this object."
-
-    def check_permission(self, request, obj, content_type):
-        return Share.objects.filter(
-            content_type=content_type,
-            object_id=obj.id,
-            shared_with=request.user,
-            can_read=True,
-        ).exists()
+    permission_field = "can_read"
 
 
-class CanEdit(CanAccess):
+class CanEdit(BaseAccessPermission):
+    """Check if the user has edit permission for the object."""
+
     message = "You do not have edit permissions for this object."
-
-    def check_permission(self, request, obj, content_type):
-        return Share.objects.filter(
-            content_type=content_type,
-            object_id=obj.id,
-            shared_with=request.user,
-            can_edit=True,
-        ).exists()
+    permission_field = "can_edit"
 
 
-class CanShare(CanAccess):
+class CanShare(BaseAccessPermission):
+    """Check if the user has share permission for the object."""
+
     message = "You do not have share permissions for this object."
-
-    def check_permission(self, request, obj, content_type):
-        return Share.objects.filter(
-            content_type=content_type,
-            object_id=obj.id,
-            shared_with=request.user,
-            can_share=True,
-        ).exists()
+    permission_field = "can_share"
 
 
-class CanDelete(CanAccess):
+class CanDelete(BaseAccessPermission):
+    """Check if the user has delete permission for the object."""
+
     message = "You do not have delete permissions for this object."
-
-    def check_permission(self, request, obj, content_type):
-        return Share.objects.filter(
-            content_type=content_type,
-            object_id=obj.id,
-            shared_with=request.user,
-            can_delete=True,
-        ).exists()
+    permission_field = "can_delete"
 
 
 class CanEditParentFolder(IsAuthenticated):
+    """Check if the user can create a folder in the specified location."""
+
     message = "You do not have permission to create a folder in this location."
 
     def has_object_permission(self, request, view):
-        # If it's not a 'create' action, this check is not needed
         if view.action != "create":
             return True
 
         parent_id = request.data.get("parent")
-
-        # If no parent_id, it's a root folder, allow creation
-        if not parent_id:
+        if not parent_id:  # Allow creation at root level
             return True
 
-        try:
-            parent_folder = Folder.objects.get(pk=parent_id)
-        except Folder.DoesNotExist:
-            # If parent folder does not exist, deny permission
+        parent_folder = Folder.objects.filter(pk=parent_id).first()
+        if not parent_folder:
             return False
 
-        # If the user is the owner of the parent folder, allow creation
-        if parent_folder.owner == request.user:
-            return True
-
-        # Check if the user has edit permissions on the parent folder
-        folder_content_type = ContentType.objects.get_for_model(Folder)
-        return Share.objects.filter(
-            shared_with=request.user,
-            content_type=folder_content_type,
-            object_id=parent_id,
-            can_edit=True,
-        ).exists()
+        return (
+            parent_folder.owner == request.user
+            or Share.objects.filter(
+                shared_with=request.user,
+                content_type=ContentType.objects.get_for_model(Folder),
+                object_id=parent_id,
+                can_edit=True,
+            ).exists()
+        )
