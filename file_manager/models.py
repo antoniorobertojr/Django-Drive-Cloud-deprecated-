@@ -26,21 +26,6 @@ class Folder(models.Model, UniqueNameMixin):
             full_name = f"{self.parent}::" + full_name
         return full_name
 
-    @property
-    def depth(self):
-        if not self.parent:
-            return 0
-        return self.parent.depth + 1
-
-    def parent_url(self):
-        url_list = []
-        temp = self
-        while temp.parent:
-            temp = temp.parent
-            url_list.append(reverse("folder:list") + "?id=" + str(temp.pk))
-
-        return url_list
-
     def save(self, *args, **kwargs):
         self.check_model_has_unique_name()
         super().save(*args, **kwargs)
@@ -72,7 +57,7 @@ class Share(models.Model):
 class File(models.Model, UniqueNameMixin):
     name = models.CharField(max_length=128)
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, null=True, blank=True)
-    file = models.FileField(upload_to="documents/")
+    file = models.FileField(upload_to='files/')
     owner = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="owned_files"
     )
@@ -83,13 +68,7 @@ class File(models.Model, UniqueNameMixin):
         return f"{self.name}"
 
     def save(self, *args, **kwargs):
+        if not self.name:
+            self.name = self.file.name
         self.check_model_has_unique_name()
         super().save(*args, **kwargs)
-
-    @property
-    def full_path(self):
-        return f"{self.folder}::{self.name}"
-
-    @property
-    def extension(self):
-        return str(self.name).split(".")[-1]
