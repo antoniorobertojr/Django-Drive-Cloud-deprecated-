@@ -1,9 +1,13 @@
+import os
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
-from file_manager.models import Share
-from file_manager.permissions import CanShare, IsOwner
+from file_manager.models import File, Share
+from file_manager.permissions import CanEditParentFolder, CanShare, IsOwner
 from rest_framework import mixins, serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -31,7 +35,6 @@ class ShareModelMixin:
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsOwner | CanShare],
     )
     def share(self, request, pk=None):
         obj = self.get_object()
@@ -100,32 +103,34 @@ class UnshareModelMixin:
         permission_classes=[IsOwner | CanShare],
     )
     def unshare(self, request, pk=None):
+        import pdb
+
+        pdb.set_trace()
         obj = self.get_object()
-        username = request.data.get("username")
-        user_to_unshare_with = get_object_or_404(User, username=username)
+        usernames = request.data.get("usernames")
+        for username in usernames:
+            user_to_unshare_with = get_object_or_404(User, username=username)
 
-        if obj.owner == user_to_unshare_with:
-            return Response(
-                {"error": "Cannot unshare with the owner"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            if obj.owner == user_to_unshare_with:
+                return Response(
+                    {"error": "Cannot unshare with the owner"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        content_type = ContentType.objects.get_for_model(obj)
-
-        Share.objects.filter(
-            shared_with=user_to_unshare_with,
-            content_type=content_type,
-            object_id=obj.id,
-        ).delete()
+            content_type = ContentType.objects.get_for_model(obj)
+            Share.objects.filter(
+                shared_with=user_to_unshare_with,
+                content_type=content_type,
+                object_id=obj.id,
+            ).delete()
 
         return Response(
-            {"status": f"{obj} unshared from {username}"}, status=status.HTTP_200_OK
+            {"status": f"{obj} unshared from {usernames}"}, status=status.HTTP_200_OK
         )
 
 
 class SharedWithMeMixin:
-    @action(detail=False, methods=["get"])
-    def shared_with_me(self, request, *args, **kwargs):
+    def get_shared_with_me(self, request, *args, **kwargs):
         model = self.queryset.model
         model_content_type = ContentType.objects.get_for_model(model)
         shared_objects_ids = Share.objects.filter(
@@ -138,9 +143,22 @@ class SharedWithMeMixin:
 
 
 class PersonalMixin:
-    @action(detail=False, methods=["get"], url_path="personal")
-    def personal_folders(self, request, *args, **kwargs):
+    def get_personal_models(self, request, *args, **kwargs):
         model = self.queryset.model
-        personal_folders = model.objects.filter(owner=request.user)
-        serializer = self.get_serializer(personal_folders, many=True)
+        personal_models = model.objects.filter(owner=request.user)
+        serializer = self.get_serializer(personal_models, many=True)
         return Response(serializer.data)
+
+
+class FileDownloadMixin:
+    def download_file(self, pk):
+        try:
+            file_instance = self.get_queryset().get(pk=pk)
+        except File.DoesNotExist:
+            raise Http404("File does not exist")
+
+        file_path = os.path.join(settings.MEDIA_ROOT, file_instance.file.name)
+        if not os.path.exists(file_path):
+            raise Http404("File does not exist on the server")
+
+        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=file_instance.name)
