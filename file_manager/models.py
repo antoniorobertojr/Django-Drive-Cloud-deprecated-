@@ -2,9 +2,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
 from django.db import models
-from django.urls import reverse
 
 from file_manager.mixins.models import UniqueNameMixin
 
@@ -21,10 +19,9 @@ class Folder(models.Model, UniqueNameMixin):
     updated_at = models.DateTimeField(auto_now=True, blank=True)
 
     def __str__(self):
-        full_name = f"{self.name}"
         if self.parent:
-            full_name = f"{self.parent}::" + full_name
-        return full_name
+            return f"{self.parent}::{self.name}"
+        return self.name
 
     def save(self, *args, **kwargs):
         self.check_model_has_unique_name()
