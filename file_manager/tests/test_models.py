@@ -20,6 +20,7 @@ class FileManagerTestCase(TestCase, UserMixin, FileMixin, FolderMixin, ShareMixi
 
         self.share1 = self.create_share(self.user1, self.user2, self.file1)
 
+    
     def test_folder_creation(self):
         folder = Folder.objects.get(name='Folder1')
         self.assertEqual(folder.name, 'Folder1')
@@ -45,3 +46,4 @@ class FileManagerTestCase(TestCase, UserMixin, FileMixin, FolderMixin, ShareMixi
         self.assertFalse(share.can_delete)
         self.assertFalse(share.can_edit)
         self.assertFalse(share.can_share)
+
