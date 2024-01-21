@@ -73,9 +73,6 @@ class CanEditParentFolder(IsAuthenticated):
     message = "You do not have permission to create a folder in this location."
 
     def has_object_permission(self, request, view):
-        if view.action != "create":
-            return True
-
         parent_id = request.data.get("parent")
         if not parent_id:  # Allow creation at root level
             return True
