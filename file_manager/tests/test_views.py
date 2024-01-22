@@ -164,6 +164,32 @@ class FileViewSetTest(APITestCase, UserMixin, FileMixin, FolderMixin, ShareMixin
         response = self.client.patch(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'Updated File Name')
+    def test_share_file(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('file-share', kwargs={'pk': self.file1.pk})
+        data = {'usernames': [self.user2.username], 'can_read': True}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_unshare_file(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('file-unshare', kwargs={'pk': self.file1.pk})
+        data = {'usernames': [self.user2.username]}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_personal_files(self):
+        self.client.force_authenticate(user=self.user1)
+        url = reverse('file-personal')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(self.file1.name, [f['name'] for f in response.data])
+
+    def test_shared_with_me_files(self):
+        self.client.force_authenticate(user=self.user2)
+        url = reverse('file-shared-with-me')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def tearDown(self):
         if os.path.exists(TEST_DIR + '/media'):
