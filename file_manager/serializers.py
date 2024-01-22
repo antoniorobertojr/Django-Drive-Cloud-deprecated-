@@ -11,11 +11,24 @@ User = get_user_model()
 class FileSerializer(serializers.ModelSerializer):
     file = serializers.FileField()
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    name = serializers.CharField(max_length=128, required=False)
 
     class Meta:
         model = File
-        fields = ["id", "file", "owner", "folder", "created_at", "updated_at"]
+        fields = ["id", "file", "name", "owner", "folder", "created_at", "updated_at"]
 
+    def create(self, validated_data):
+        # Handle file creation
+        if 'name' not in validated_data or not validated_data['name']:
+            validated_data['name'] = validated_data['file'].name
+        return File.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        # Handle file updating
+        instance.name = validated_data.get('name', instance.name)
+        # Add other fields that need to be updated here
+        instance.save()
+        return instance
 
 class FolderSerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()

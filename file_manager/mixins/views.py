@@ -100,7 +100,6 @@ class UnshareModelMixin:
     @action(
         detail=True,
         methods=["post"],
-        permission_classes=[IsOwner | CanShare],
     )
     def unshare(self, request, pk=None):
         obj = self.get_object()
