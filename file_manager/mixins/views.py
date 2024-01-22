@@ -103,9 +103,6 @@ class UnshareModelMixin:
         permission_classes=[IsOwner | CanShare],
     )
     def unshare(self, request, pk=None):
-        import pdb
-
-        pdb.set_trace()
         obj = self.get_object()
         usernames = request.data.get("usernames")
         for username in usernames:
@@ -130,7 +127,7 @@ class UnshareModelMixin:
 
 
 class SharedWithMeMixin:
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=['get'], url_path='shared-with-me')
     def shared_with_me(self, request, *args, **kwargs):
         model = self.queryset.model
         model_content_type = ContentType.objects.get_for_model(model)
