@@ -21,7 +21,7 @@ class FileSerializerTest(TestCase, UserMixin, FolderMixin, FileMixin):
         data = self.serializer.data
         self.assertEqual(
             set(data.keys()),
-            set(["id", "file", "folder", "created_at", "updated_at"]),
+            set(["id", "name", "file", "folder", "created_at", "updated_at"]),
         )
 
     def test_file_field_content(self):
