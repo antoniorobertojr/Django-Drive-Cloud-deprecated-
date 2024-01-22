@@ -25,13 +25,15 @@ class FileMixin:
         return File.objects.create(name=name, folder=folder, owner=owner, file=file)
 
 class ShareMixin:
-    def create_share(self, shared_by, shared_with, content_object, can_read=True):
+    def create_share(self, shared_by, shared_with, content_object, can_read=True, can_edit=False, can_delete=False, can_share=False):
         content_type = ContentType.objects.get_for_model(type(content_object))
         return Share.objects.create(
             shared_by=shared_by,
             shared_with=shared_with,
             content_type=content_type,
             object_id=content_object.id,
-            can_read=can_read
+            can_read=can_read,
+            can_edit=can_edit,
+            can_delete=can_delete,
+            can_share=can_share,
         )
-
