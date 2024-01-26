@@ -15,22 +15,23 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()  # Load the .env file
+load_dotenv(".env")  # Load the .env file
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-av^h50ur_e=ru9%$n75f*l16a2^31f66+089l9!3rl!34nczr8"
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [os.getenv("DJANGO_HOST", "")]
+# Once you know the full DNS name of your website, list it here to
+# prevent HTTP Host Header attacks
+ALLOWED_HOSTS = [os.getenv("DJANGO_HOST", "*")]
 
 
 # Application definition
@@ -85,12 +86,24 @@ WSGI_APPLICATION = "core.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+if os.environ.get("IS_LOCAL") == "True":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": os.environ["DATABASE_NAME"],
+            "USER": os.environ["USER_NAME"],
+            "PASSWORD": os.environ["USER_PASSWORD"],
+            "HOST": os.environ["DATABASE_ADDRESS"],
+            "PORT": os.environ["DATABASE_PORT"],
+        }
+    }
 
 
 # Password validation
