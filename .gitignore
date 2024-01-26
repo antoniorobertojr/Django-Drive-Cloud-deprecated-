@@ -162,4 +162,5 @@ backend/test_data/
 backend/.env
 infrastructure/Pulumi.dev.yaml
 infrastructure/Pulumi.dev2.yaml
+infrastructure/venv
 todo
