@@ -1,0 +1,5 @@
+pulumi==3.103.1
+pulumi-docker==3.6.1
+pulumi_aws==6.18.2
+pulumi_mysql==3.2.1
+python-dotenv==0.21.1
