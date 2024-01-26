@@ -2,6 +2,48 @@
 
 Sets up a Django solution similar to Google Drive, but using AWS infrastructure. It utilizes Django Rest Framework for file and folder management functionalities like upload, share, and unshare. The architecture leverages ECS with Fargate for scalable container management, RDS for reliable database services, and ECR for efficient Docker image storage.
 
+## Installation
+
+1. **Configure AWS CLI** 
+Ensure AWS CLI is installed and configured with the necessary access credentials and default region:
+```
+aws configure
+```
+2. **Clone the Repository**
+Clone the project repository to your local machine.
+```
+mkdir django-drive-cloud
+cd django-drive-cloud
+git clone https://github.com/juniormach96/Django-Drive-Cloud .
+```
+
+3. **Create and Activate Python Virtual Environment**
+Create a Python virtual environment and activate it.
+```
+python3 -m venv .venv
+source .venv/bin/activate
+```
+4. **Install Required Python Packages**
+Install the necessary Python packages using pip.
+```
+pip install -r infrastructure/requirements-pulumi.txt
+```
+5. **Configure Environment Variables**
+Rename the example environment file and update it with your specific values.
+```
+mv infrastructure/.env-example infrastructure/.env
+```
+6. **Edit infrastructure/.env with your desired configurations**
+7. **Set Up Pulumi Configuration**
+Run the setup script to configure Pulumi with the variables you've declared.
+```
+python3 infrastructure/setup.py
+```
+8. **Initialize Infrastructure**
+Deploy the infrastructure using Pulumi.
+```
+pulumi up
+```
 
 ## How it Works
 
