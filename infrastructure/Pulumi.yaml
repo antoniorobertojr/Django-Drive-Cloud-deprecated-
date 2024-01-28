@@ -2,7 +2,7 @@ name: django-rest-file-manager
 runtime:
   name: python
   options:
-    virtualenv: venv
+    virtualenv: ../.venv
 description: A django app to manage and share files
 template:
   config:
