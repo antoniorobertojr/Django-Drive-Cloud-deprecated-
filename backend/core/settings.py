@@ -157,6 +157,6 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "Your API Title",
-    "DESCRIPTION": "Your API Description",
+    "TITLE": "Django Drive Cloud",
+    "DESCRIPTION": "Store and Share Files and Folders",
 }
