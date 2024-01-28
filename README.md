@@ -37,7 +37,8 @@ mv infrastructure/.env-example infrastructure/.env
 7. **Set Up Pulumi Configuration**
 Run the setup script to configure Pulumi with the variables you've declared.
 ```
-python3 infrastructure/setup.py
+cd infrastructure
+python3 setup.py
 ```
 8. **Initialize Infrastructure**
 Deploy the infrastructure using Pulumi.
